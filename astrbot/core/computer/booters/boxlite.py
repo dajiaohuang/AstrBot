@@ -123,10 +123,13 @@ class MockShipyardSandboxClient:
                     async with session.get(url) as response:
                         if response.status == 200:
                             logger.info(f"Sandbox {ship_id} is healthy")
-                return
-            except Exception:
+                            return
+            except Exception as exc:
+                logger.debug("Sandbox health request failed: %s", exc)
+            loop -= 1
+            if loop:
                 await asyncio.sleep(1)
-                loop -= 1
+        raise RuntimeError(f"Sandbox {ship_id} did not become healthy")
 
 
 class BoxliteBooter(ComputerBooter):
