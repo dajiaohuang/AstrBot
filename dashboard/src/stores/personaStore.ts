@@ -51,6 +51,7 @@ export const usePersonaStore = defineStore("persona", {
     currentPersonas: [] as Persona[],
     breadcrumbPath: [] as FolderTreeNode[],
     expandedFolderIds: [] as string[], // Store expanded folder IDs
+    navigationRequestId: 0,
     loading: false,
     treeLoading: false,
   }),
@@ -111,6 +112,7 @@ export const usePersonaStore = defineStore("persona", {
      * 导航到指定文件夹
      */
     async navigateToFolder(folderId: string | null): Promise<void> {
+      const requestId = ++this.navigationRequestId;
       this.loading = true;
       try {
         this.currentFolderId = folderId;
@@ -120,6 +122,8 @@ export const usePersonaStore = defineStore("persona", {
           personaApi.folders(folderId),
           personaApi.list(folderId),
         ]);
+
+        if (requestId !== this.navigationRequestId) return;
 
         if (foldersRes.data.status === 'ok') {
           this.currentFolders = foldersRes.data.data || [];
@@ -131,8 +135,10 @@ export const usePersonaStore = defineStore("persona", {
 
         // 更新面包屑
         this.updateBreadcrumb(folderId);
+      } catch (error) {
+        if (requestId === this.navigationRequestId) throw error;
       } finally {
-        this.loading = false;
+        if (requestId === this.navigationRequestId) this.loading = false;
       }
     },
 
@@ -260,22 +266,27 @@ export const usePersonaStore = defineStore("persona", {
      */
     async deleteFolder(folderId: string): Promise<void> {
       const deletedFolder = this.findFolderInTree(folderId);
-      const isCurrentFolderDeleted =
-        this.currentFolderId === folderId ||
-        this.breadcrumbPath.some(folder => folder.folder_id === folderId);
       const response = await personaApi.deleteFolder(folderId);
 
       if (response.data.status !== 'ok') {
         throw new Error(response.data.message || '删除文件夹失败');
       }
 
+      const containsCurrentFolder = (folder: FolderTreeNode): boolean =>
+        folder.folder_id === this.currentFolderId ||
+        folder.children.some(containsCurrentFolder);
+      const isCurrentFolderDeleted = this.currentFolderId === folderId ||
+        deletedFolder?.children.some(containsCurrentFolder);
+      const navigationRequestId = this.navigationRequestId;
       // If the active folder was deleted, return to its parent instead of
       // keeping a stale folder ID that would hide moved personas and folders.
       const targetFolderId = isCurrentFolderDeleted
         ? deletedFolder?.parent_id ?? null
         : this.currentFolderId;
       await this.loadFolderTree();
-      await this.navigateToFolder(targetFolderId);
+      if (navigationRequestId === this.navigationRequestId) {
+        await this.navigateToFolder(targetFolderId);
+      }
     },
 
     /**

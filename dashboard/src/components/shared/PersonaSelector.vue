@@ -158,19 +158,24 @@ async function loadFolderTree() {
   }
 }
 
+let personasRequestId = 0;
+
 // 加载指定文件夹的人格
 async function loadPersonasInFolder(folderId: string | null) {
+  const requestId = ++personasRequestId;
   itemsLoading.value = true;
   try {
     const response = await personaApi.list(folderId);
+    if (requestId !== personasRequestId) return;
     if (response.data.status === "ok") {
       currentPersonas.value = response.data.data || [];
     }
   } catch (error) {
+    if (requestId !== personasRequestId) return;
     console.error("加载人格列表失败:", error);
     currentPersonas.value = [];
   } finally {
-    itemsLoading.value = false;
+    if (requestId === personasRequestId) itemsLoading.value = false;
   }
 }
 
