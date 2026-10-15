@@ -178,7 +178,7 @@ class ResultDecorateStage(Stage):
                         f"{star_map[handler.handler_module_path].name} - "
                         f"{handler.handler_name} cleared the message result.",
                     )
-            except BaseException:
+            except Exception:
                 logger.error(traceback.format_exc())
 
             if event.is_stopped():
