@@ -25,20 +25,25 @@ async def migrate_45_to_46(acm: AstrBotConfigManager, ucr: UmopConfigRouter) -> 
 
     logger.info("Starting migration from version 4.5 to 4.6")
 
-    # extract umo->conf_id mapping
+    cleaned = {}
+    # Prepare without removing retry metadata from the live mapping.
     umo_to_conf_id = {}
     for conf_id, conf_info in abconf_data.items():
         if isinstance(conf_info, dict) and "umop" in conf_info:
-            umop_ls = conf_info.pop("umop")
+            cleaned[conf_id] = {key: value for key, value in conf_info.items() if key != "umop"}
+            umop_ls = conf_info["umop"]
             if not isinstance(umop_ls, list):
                 continue
             for umo in umop_ls:
                 if isinstance(umo, str) and umo not in umo_to_conf_id:
                     umo_to_conf_id[umo] = conf_id
 
-    # update the abconf data
-    await sp.global_put("abconf_mapping", abconf_data)
-    # update the umop config router
+        else:
+            cleaned[conf_id] = conf_info
+
+    # Validate and persist routing before discarding legacy retry metadata.
     await ucr.update_routing_data(umo_to_conf_id)
+    await sp.global_put("abconf_mapping", cleaned)
+    acm.abconf_data = cleaned
 
     logger.info("Migration from version 45 to 46 completed successfully")

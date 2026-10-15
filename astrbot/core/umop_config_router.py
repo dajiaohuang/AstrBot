@@ -77,8 +77,8 @@ class UmopConfigRouter:
                     "umop keys must be strings in the format [platform_id]:[message_type]:[session_id], with optional wildcards * or empty for all",
                 )
 
+        await self.sp.global_put("umop_config_routing", new_routing)
         self.umop_to_conf_id = new_routing
-        await self.sp.global_put("umop_config_routing", self.umop_to_conf_id)
 
     async def update_route(self, umo: str, conf_id: str) -> None:
         """更新一条路由
